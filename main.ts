@@ -13,8 +13,16 @@ const ENTRY_LINE =
 
 // Gate: /output/entry.txt must be UTF-8 text of 1 to 200 characters,
 // not only white space.
-const GATE_MIN_CHARS = 1;
-const GATE_MAX_CHARS = 200;
+const GATE = {
+  minChars: 1,
+  maxChars: 200,
+  singleLine: true,
+};
+
+function describeGate(): string {
+  return `entry must be ${GATE.minChars}-${GATE.maxChars} characters, ` +
+    `a single line, and not only white space`;
+}
 
 function buildEntryLine(): string {
   return ENTRY_LINE;
@@ -22,17 +30,28 @@ function buildEntryLine(): string {
 
 function validateEntry(line: string): void {
   const length = [...line].length;
-  if (length < GATE_MIN_CHARS || length > GATE_MAX_CHARS) {
+  if (length < GATE.minChars || length > GATE.maxChars) {
     throw new Error(
-      `Entry must be ${GATE_MIN_CHARS}-${GATE_MAX_CHARS} characters, got ${length}.`,
+      `Entry must be ${GATE.minChars}-${GATE.maxChars} characters, got ${length}.`,
     );
   }
   if (line.trim().length === 0) {
     throw new Error("Entry must not be only white space.");
   }
-  if (line.includes("\n") || line.includes("\r")) {
+  if (GATE.singleLine && (line.includes("\n") || line.includes("\r"))) {
     throw new Error("Entry must be a single line.");
   }
+}
+
+// Write the validated line byte-identically: no trailing newline,
+// the entry is the line.
+function writeEntry(line: string, outPath: string): void {
+  mkdirSync(join(outPath, ".."), { recursive: true });
+  writeFileSync(outPath, line, "utf8");
+}
+
+function reportWrite(line: string, outPath: string): void {
+  console.log(`Wrote ${[...line].length} characters to ${outPath}`);
 }
 
 // Resolve where the grader wants the output. The harness sets
@@ -53,12 +72,14 @@ function resolveOutputPath(): string {
 
 function main(): void {
   const line = buildEntryLine();
-  validateEntry(line);
+  try {
+    validateEntry(line);
+  } catch (err) {
+    throw new Error(`${describeGate()} — ${err.message}`);
+  }
   const outPath = resolveOutputPath();
-  mkdirSync(join(outPath, ".."), { recursive: true });
-  // Byte-identical write: no trailing newline, the entry is the line.
-  writeFileSync(outPath, line, "utf8");
-  console.log(`Wrote ${[...line].length} characters to ${outPath}`);
+  writeEntry(line, outPath);
+  reportWrite(line, outPath);
 }
 
 main();
